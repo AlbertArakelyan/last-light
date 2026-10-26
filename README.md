@@ -73,17 +73,25 @@ The build normally finds libclang in the Command Line Tools automatically. If it
 <details open>
 <summary><strong>Linux (Ubuntu / Debian)</strong></summary>
 
-1. **Compiler, CMake and libclang**:
+1. **Compiler and CMake**:
    ```sh
    sudo apt update
-   sudo apt install build-essential cmake pkg-config clang libclang-dev
+   sudo apt install build-essential cmake pkg-config
    ```
-2. **Libraries for the egui window** (X11/Wayland, keyboard, OpenGL):
+2. **LLVM (clang and libclang)**. On Ubuntu, LLVM comes as the `clang` and `libclang-dev` packages, which install Ubuntu's default LLVM version:
+   ```sh
+   sudo apt install clang libclang-dev
+   ```
+   The build normally finds libclang automatically. If it doesn't (`Unable to find libclang`), point it at the LLVM `lib` folder, replacing `18` with your installed version (`ls /usr/lib/llvm-*`):
+   ```sh
+   export LIBCLANG_PATH=/usr/lib/llvm-18/lib
+   ```
+3. **Libraries for the egui window** (X11/Wayland, keyboard, OpenGL):
    ```sh
    sudo apt install libxkbcommon-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
      libwayland-dev libgl1-mesa-dev
    ```
-3. **Rust** via [rustup](https://rustup.rs). Distro packages of Rust are usually too old:
+4. **Rust** via [rustup](https://rustup.rs). Distro packages of Rust are usually too old:
    ```sh
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    ```
