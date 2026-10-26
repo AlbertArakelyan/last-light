@@ -1,4 +1,5 @@
 mod apps;
+mod storage;
 
 use apps::MiniApp;
 use eframe::egui;

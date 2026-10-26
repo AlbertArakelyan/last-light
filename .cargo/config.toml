@@ -3,5 +3,7 @@
 rustflags = ["-C", "target-feature=+crt-static"]
 
 [env]
+# Read only when building llama.cpp for Windows MSVC; ignored on other targets.
 LLAMA_STATIC_CRT = "1"
-CMAKE_TOOLCHAIN_FILE = { value = "cmake/static-crt.cmake", relative = true }
+# Target-suffixed so cmake-rs applies it to Windows MSVC builds only.
+CMAKE_TOOLCHAIN_FILE_x86_64_pc_windows_msvc = { value = "cmake/static-crt.cmake", relative = true }
