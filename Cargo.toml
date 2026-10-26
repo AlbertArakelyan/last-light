@@ -6,5 +6,9 @@ edition = "2024"
 [dependencies]
 dirs = "7.0.0"
 eframe = "0.37.0"
+egui_commonmark = { version = "0.26.0", default-features = false, features = ["pulldown_cmark"] }
 llama-cpp-2 = { version = "0.1.160", default-features = false }
 rusqlite = { version = "0.41.0", features = ["bundled"] }
+
+[dev-dependencies]
+tempfile = "3.27.0"

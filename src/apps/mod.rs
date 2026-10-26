@@ -1,4 +1,6 @@
 mod ai_chat;
+mod text_editor;
+mod widgets;
 
 use eframe::egui;
 
@@ -7,6 +9,8 @@ pub trait MiniApp {
     fn name(&self) -> &str;
     fn description(&self) -> &str;
     fn ui(&mut self, ui: &mut egui::Ui);
+    /// Called when the user leaves the app for the card grid, e.g. to flush unsaved work.
+    fn on_close(&mut self) {}
 }
 
 /// Stand-in for apps that aren't built yet.
@@ -41,10 +45,7 @@ impl MiniApp for Placeholder {
 
 pub fn all() -> Vec<Box<dyn MiniApp>> {
     vec![
-        Box::new(Placeholder::new(
-            "Text Editor",
-            "Write and save plain-text notes.",
-        )),
+        Box::new(text_editor::TextEditor::new()),
         Box::new(ai_chat::AiChat::new()),
         Box::new(Placeholder::new("Journal", "Keep a dated log of each day.")),
         Box::new(Placeholder::new(

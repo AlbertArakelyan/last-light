@@ -29,7 +29,7 @@ The shipped app is `last-light.exe` plus its `assets/` folder. It must run with 
 ## Architecture
 
 - **App shell (`src/main.rs`):** `LastLightApp` holds `Vec<Box<dyn MiniApp>>` and `open: Option<usize>`. `None` shows the card grid. `Some(i)` renders that app, and the header shows a Back button. Cards are hand-painted (painter + galleys rather than label widgets) so their text can't steal clicks from the card.
-- **Mini apps (`src/apps/`):** every app implements the `MiniApp` trait (`name`, `description`, `ui`) and is registered in `apps::all()`. Unbuilt apps use `Placeholder`.
+- **Mini apps (`src/apps/`):** every app implements the `MiniApp` trait (`name`, `description`, `ui`, plus an optional `on_close` that the shell calls on Back) and is registered in `apps::all()`. Unbuilt apps use `Placeholder`. Shared widgets live in `src/apps/widgets.rs`: `list_row` (a sidebar row with a truncated title, a "..." menu and inline rename, laid out so it can never widen its panel) and `inline_input`.
 - **Storage (`src/storage.rs`):** all mini apps share one SQLite database, `last-light.db`, in the per-user data folder (`%APPDATA%\Last Light`). `rusqlite` uses the `bundled` feature, so SQLite is compiled into the exe. Each app creates its own tables with `CREATE TABLE IF NOT EXISTS`.
 - **AI Chat (`src/apps/ai_chat/`):**
   - **`mod.rs` (UI state):** the chat side panel and messages.
@@ -46,6 +46,10 @@ The shipped app is `last-light.exe` plus its `assets/` folder. It must run with 
   - **No thinking:** the prompt has an empty `<think>\n\n</think>\n\n` block appended so Qwen3.5 answers without thinking.
   - **UTF-8 streaming:** token bytes are buffered until they form valid UTF-8, because tokens can split multi-byte characters.
   - **One backend per process:** llama's backend can only be initialized once per process, so the model-backed tests share one model through a `OnceLock`.
+- **Text Editor (`src/apps/text_editor/`):** Markdown notes as plain files, not SQLite, so they stay readable without the app.
+  - **`store.rs` (files):** notes live at `<data dir>/notes/<folder>/<note>.md`, exactly one folder level deep. Every path goes through `validate_name`, which applies the same portable file-name rules to folders and notes. Creating or renaming onto an existing name is an error (folders are never merged), except a case-only rename. Saves go through a hidden temp file plus a rename, so a crash can't leave a half-written note. `general` is created only when the notes folder itself is first created, so a deleted `general` doesn't come back.
+  - **`mod.rs` (UI):** a toggleable sidebar (folders panel plus the selected folder's notes panel), a toolbar with Split, Edit and View modes, and the editor. The Markdown preview is `egui_commonmark` (default features off, so it never loads images or fetches anything). `show_mut` lets ticking a task checkbox in the preview edit the source.
+  - **Saving:** the open note is one `OpenNote` that carries its own folder and name, so a save can never land in the wrong file. Autosave runs 500 ms after typing stops. Ctrl/Cmd+S saves immediately, and so do `on_close` (Back) and `Drop` (window close). Flush with `save()` before any rename or switch, since a pending save targets the old path.
 - **egui 0.37 API:** most online examples use older APIs. Here, apps implement `fn ui(&mut self, ui: &mut egui::Ui, ...)` rather than `update(ctx)`. Panels are `egui::Panel::top/bottom(...).show(ui, ...)` (`TopBottomPanel` is gone), and `CentralPanel::show` takes `ui`.
 
 ## Assets and model

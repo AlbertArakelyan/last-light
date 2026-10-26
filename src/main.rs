@@ -88,7 +88,10 @@ impl eframe::App for LastLightApp {
         egui::Panel::top("header").show(ui, |ui| {
             ui.add_space(8.0);
             ui.horizontal(|ui| {
-                if self.open.is_some() && ui.button("< Back").clicked() {
+                if let Some(i) = self.open
+                    && ui.button("< Back").clicked()
+                {
+                    self.apps[i].on_close();
                     self.open = None;
                 }
                 let title = match self.open {

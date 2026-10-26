@@ -18,7 +18,7 @@ egui 0.37 renamed several core APIs, and most examples online (and in model memo
 
 ## Pitfalls already hit in this codebase
 
-- **Panels grow when content overflows.** If a row is wider than the panel, egui widens the panel every frame, ignoring `size_range` and the user's resizing. Lay out rows so they can never overflow: put fixed-size widgets first in a `Layout::right_to_left` row, then give the flexible widget exactly `ui.available_width()` with `.truncate()`. See `chat_row` in `src/apps/ai_chat/mod.rs`.
+- **Panels grow when content overflows.** If a row is wider than the panel, egui widens the panel every frame, ignoring `size_range` and the user's resizing. Lay out rows so they can never overflow: put fixed-size widgets first in a `Layout::right_to_left` row, then give the flexible widget exactly `ui.available_width()` with `.truncate()`. Reuse `list_row` in `src/apps/widgets.rs` for sidebar rows; it already does this.
 - **Labels swallow clicks.** Labels are selectable by default, so a label on top of a clickable area steals hover and clicks. For custom clickable surfaces, allocate with `Sense::click()` and paint text with `ui.painter().layout(...)` plus `painter.galley(...)` instead of adding label widgets. See `card` in `src/main.rs`.
 - **Spacing leaks into children.** Changing `ui.spacing_mut().item_spacing` affects every child UI too, which caused oversized line gaps in cards.
 - **Rename-style text fields:** check `lost_focus()` first (Escape cancels, anything else commits), and only `request_focus()` while the field doesn't have focus. Otherwise clicking away never commits.
@@ -39,4 +39,4 @@ for _ in 0..20 {
 }
 ```
 
-Render several frames (sizes settle over frames) and confirm the test fails on the buggy layout before trusting it. See `long_titles_do_not_widen_the_chat_list` in `src/apps/ai_chat/mod.rs`.
+Render several frames (sizes settle over frames) and confirm the test fails on the buggy layout before trusting it. See `long_titles_do_not_widen_the_panel` in `src/apps/widgets.rs`. To measure a panel nested inside an app, load its `PanelState` (id = parent `ui.scope_id().with_salt(IdSalt::new(name))`), as in `long_names_do_not_widen_the_sidebar_in_any_mode` in `src/apps/text_editor/mod.rs`. Measuring the root `ui.min_rect()` does not work: panels clip overflow instead of growing the root.

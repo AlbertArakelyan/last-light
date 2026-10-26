@@ -23,7 +23,7 @@ Last Light is a post-apocalyptic survival toolkit for the desktop. The scenario:
 
 | App | Description |
 |---|---|
-| **Text Editor** | Create, open, edit and save plain-text notes on local disk. |
+| **Text Editor** | Markdown notes stored as plain `.md` files in `notes/<folder>/<note>.md` (one folder level). Split, Edit and View modes; a toggleable sidebar for creating, renaming and deleting folders and notes; autosave. |
 | **AI Chat** | Chat with a lightweight language model that runs locally. The model file is downloaded ahead of time and loaded from disk, with no network calls. |
 
 ### Ideas (not committed)

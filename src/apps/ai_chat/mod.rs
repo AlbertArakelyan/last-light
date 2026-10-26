@@ -7,6 +7,7 @@ mod worker;
 use eframe::egui;
 
 use super::MiniApp;
+use super::widgets::{RowAction, list_row};
 use store::{ChatSummary, Store};
 use worker::{Event, Request, Worker};
 
@@ -383,76 +384,24 @@ impl MiniApp for AiChat {
     }
 }
 
-/// One row in the chat list: a selectable title plus a "..." menu, or a text
-/// field while the chat is being renamed.
+/// One row in the chat list, mapping the shared row widget's actions to this chat.
 fn chat_row(
     ui: &mut egui::Ui,
     chat: &ChatSummary,
     selected: bool,
     renaming: &mut Option<(i64, String)>,
 ) -> Option<ChatAction> {
-    if let Some((id, title)) = renaming
-        && *id == chat.id
-    {
-        let edit = ui.add(egui::TextEdit::singleline(title).desired_width(f32::INFINITY));
-        if edit.lost_focus() {
-            let cancelled = ui.input(|i| i.key_pressed(egui::Key::Escape));
-            return Some(if cancelled {
-                ChatAction::CancelRename
-            } else {
-                ChatAction::FinishRename
-            });
-        }
-        if !edit.has_focus() {
-            edit.request_focus();
-        }
-        return None;
-    }
-
-    // Lay out right to left: the menu button takes its natural width first and
-    // the title gets exactly what's left, so a long title is truncated instead
-    // of overflowing the row (which would make the panel grow).
-    let mut action = None;
-    let row = egui::Layout::right_to_left(egui::Align::Center);
-    ui.allocate_ui_with_layout(egui::vec2(ui.available_width(), 24.0), row, |ui| {
-        ui.menu_button("...", |ui| {
-            action = chat_menu(ui, chat.id).or(action.take())
-        });
-
-        let title_width = ui.available_width();
-        let title = ui
-            .scope_builder(
-                egui::UiBuilder::new().layout(egui::Layout::left_to_right(egui::Align::Center)),
-                |ui| {
-                    ui.set_max_width(title_width);
-                    ui.add(
-                        egui::Button::selectable(selected, chat.title.as_str())
-                            .truncate()
-                            .min_size(egui::vec2(title_width, 24.0)),
-                    )
-                },
-            )
-            .inner
-            .on_hover_text(&chat.title);
-        if title.clicked() {
-            action = Some(ChatAction::Open(chat.id));
-        }
-        if title.double_clicked() {
-            action = Some(ChatAction::StartRename(chat.id));
-        }
-        title.context_menu(|ui| action = chat_menu(ui, chat.id).or(action.take()));
-    });
-    action
-}
-
-fn chat_menu(ui: &mut egui::Ui, id: i64) -> Option<ChatAction> {
-    if ui.button("Rename").clicked() {
-        return Some(ChatAction::StartRename(id));
-    }
-    if ui.button("Delete").clicked() {
-        return Some(ChatAction::Delete(id));
-    }
-    None
+    let rename = match renaming {
+        Some((id, title)) if *id == chat.id => Some(title),
+        _ => None,
+    };
+    list_row(ui, &chat.title, selected, rename).map(|action| match action {
+        RowAction::Open => ChatAction::Open(chat.id),
+        RowAction::StartRename => ChatAction::StartRename(chat.id),
+        RowAction::FinishRename => ChatAction::FinishRename,
+        RowAction::CancelRename => ChatAction::CancelRename,
+        RowAction::Delete => ChatAction::Delete(chat.id),
+    })
 }
 
 fn message_ui(ui: &mut egui::Ui, role: Role, text: &str) {
@@ -475,48 +424,5 @@ fn truncate_title(text: &str) -> String {
     match line.char_indices().nth(TITLE_MAX_CHARS) {
         Some((end, _)) => format!("{}...", line[..end].trim_end()),
         None => line.to_owned(),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// Renders the chat list panel for several frames and returns its width each frame.
-    fn panel_widths(title: &str) -> Vec<f32> {
-        let ctx = egui::Context::default();
-        let chat = ChatSummary {
-            id: 1,
-            title: title.to_owned(),
-        };
-        let mut renaming = None;
-        let mut widths = Vec::new();
-        for _ in 0..20 {
-            let output = ctx.run_ui(Default::default(), |ui| {
-                let panel = egui::Panel::left("chat_list")
-                    .resizable(true)
-                    .default_size(220.0)
-                    .size_range(160.0..=400.0)
-                    .show(ui, |ui| {
-                        egui::ScrollArea::vertical()
-                            .auto_shrink(false)
-                            .show(ui, |ui| {
-                                chat_row(ui, &chat, true, &mut renaming);
-                            });
-                    });
-                widths.push(panel.response.rect.width());
-            });
-            output.drop_without_applying_deltas();
-        }
-        widths
-    }
-
-    #[test]
-    fn long_titles_do_not_widen_the_chat_list() {
-        let short = panel_widths("Water");
-        let long = panel_widths(&"A very long chat title that keeps going ".repeat(10));
-        println!("short: {:?}\nlong: {:?}", short.last(), long.last());
-        assert_eq!(short.last(), long.last());
-        assert!(long.iter().all(|w| *w <= 400.0));
     }
 }

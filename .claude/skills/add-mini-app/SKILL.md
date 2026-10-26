@@ -12,7 +12,9 @@ Every mini app is a type implementing `MiniApp` (`src/apps/mod.rs`) and register
 1. **Pick the module shape.**
    - Simple app: `src/apps/<name>.rs`.
    - App with storage or a worker thread: a folder `src/apps/<name>/` with `mod.rs` (UI and state), plus `store.rs` (SQLite) and/or `worker.rs` as needed. Mirror `src/apps/ai_chat/`.
-2. **Implement `MiniApp`**: `name()` is the card and header title, `description()` is one short sentence for the card, and `ui(&mut self, ui)` draws the app inside the central area.
+2. **Implement `MiniApp`**: `name()` is the card and header title, `description()` is one short sentence for the card, and `ui(&mut self, ui)` draws the app inside the central area. Override `on_close()` if the app has unsaved work: the shell calls it when the user clicks Back. Also flush in `Drop` for when the window closes; see `src/apps/text_editor/mod.rs`.
+   - **Sidebar lists:** use `widgets::list_row` (title, "..." menu, inline rename) and `widgets::inline_input` (new-item fields) from `src/apps/widgets.rs`, rather than hand-rolling rows.
+   - **Plain files instead of SQLite:** for user documents, mirror `src/apps/text_editor/store.rs`. It validates names, never merges on collision, and saves atomically through a temp file plus a rename.
 3. **Register it** in `apps::all()` in `src/apps/mod.rs`. If a `Placeholder::new("<Name>", ...)` already exists for it, replace that line rather than adding a second card.
 4. **Persistence (if the app keeps data):**
    - Open the shared DB with `crate::storage::open_db()`. It's one `last-light.db` in the per-user data folder, shared by all apps.
