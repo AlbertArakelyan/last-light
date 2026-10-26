@@ -386,16 +386,28 @@ fn chat_row(
         return None;
     }
 
+    // Lay out right to left: the menu button takes its natural width first and
+    // the title gets exactly what's left, so a long title is truncated instead
+    // of overflowing the row (which would make the panel grow).
     let mut action = None;
-    ui.horizontal(|ui| {
-        let menu_width = 24.0;
-        let title_width = ui.available_width() - menu_width - ui.spacing().item_spacing.x;
+    let row = egui::Layout::right_to_left(egui::Align::Center);
+    ui.allocate_ui_with_layout(egui::vec2(ui.available_width(), 24.0), row, |ui| {
+        ui.menu_button("...", |ui| action = chat_menu(ui, chat.id).or(action.take()));
+
+        let title_width = ui.available_width();
         let title = ui
-            .add(
-                egui::Button::selectable(selected, chat.title.as_str())
-                    .truncate()
-                    .min_size(egui::vec2(title_width, 24.0)),
+            .scope_builder(
+                egui::UiBuilder::new().layout(egui::Layout::left_to_right(egui::Align::Center)),
+                |ui| {
+                    ui.set_max_width(title_width);
+                    ui.add(
+                        egui::Button::selectable(selected, chat.title.as_str())
+                            .truncate()
+                            .min_size(egui::vec2(title_width, 24.0)),
+                    )
+                },
             )
+            .inner
             .on_hover_text(&chat.title);
         if title.clicked() {
             action = Some(ChatAction::Open(chat.id));
@@ -403,9 +415,7 @@ fn chat_row(
         if title.double_clicked() {
             action = Some(ChatAction::StartRename(chat.id));
         }
-
         title.context_menu(|ui| action = chat_menu(ui, chat.id).or(action.take()));
-        ui.menu_button("...", |ui| action = chat_menu(ui, chat.id).or(action.take()));
     });
     action
 }
@@ -440,5 +450,43 @@ fn truncate_title(text: &str) -> String {
     match line.char_indices().nth(TITLE_MAX_CHARS) {
         Some((end, _)) => format!("{}...", line[..end].trim_end()),
         None => line.to_owned(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Renders the chat list panel for several frames and returns its width each frame.
+    fn panel_widths(title: &str) -> Vec<f32> {
+        let ctx = egui::Context::default();
+        let chat = ChatSummary { id: 1, title: title.to_owned() };
+        let mut renaming = None;
+        let mut widths = Vec::new();
+        for _ in 0..20 {
+            let output = ctx.run_ui(Default::default(), |ui| {
+                let panel = egui::Panel::left("chat_list")
+                    .resizable(true)
+                    .default_size(220.0)
+                    .size_range(160.0..=400.0)
+                    .show(ui, |ui| {
+                        egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
+                            chat_row(ui, &chat, true, &mut renaming);
+                        });
+                    });
+                widths.push(panel.response.rect.width());
+            });
+            output.drop_without_applying_deltas();
+        }
+        widths
+    }
+
+    #[test]
+    fn long_titles_do_not_widen_the_chat_list() {
+        let short = panel_widths("Water");
+        let long = panel_widths(&"A very long chat title that keeps going ".repeat(10));
+        println!("short: {:?}\nlong: {:?}", short.last(), long.last());
+        assert_eq!(short.last(), long.last());
+        assert!(long.iter().all(|w| *w <= 400.0));
     }
 }
