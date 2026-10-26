@@ -91,7 +91,11 @@ impl eframe::App for LastLightApp {
                 if self.open.is_some() && ui.button("< Back").clicked() {
                     self.open = None;
                 }
-                ui.heading("Last Light");
+                let title = match self.open {
+                    Some(i) => format!("{} | Last Light", self.apps[i].name()),
+                    None => "Last Light".to_owned(),
+                };
+                ui.heading(title);
             });
             ui.add_space(8.0);
         });
