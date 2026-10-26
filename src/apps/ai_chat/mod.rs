@@ -123,7 +123,11 @@ impl AiChat {
                 self.messages = self.check(self.store.messages(id)).unwrap_or_default();
             }
             ChatAction::StartRename(id) => {
-                let title = self.chats.iter().find(|c| c.id == id).map(|c| c.title.clone());
+                let title = self
+                    .chats
+                    .iter()
+                    .find(|c| c.id == id)
+                    .map(|c| c.title.clone());
                 self.renaming = title.map(|title| (id, title));
             }
             ChatAction::FinishRename => {
@@ -166,7 +170,9 @@ impl AiChat {
                 }
             }
             Event::ReplyDone { chat_id } => {
-                let Some(streaming) = self.streaming.take() else { return };
+                let Some(streaming) = self.streaming.take() else {
+                    return;
+                };
                 // The chat may have been deleted while the reply was streaming.
                 if !self.chats.iter().any(|c| c.id == chat_id) {
                     return;
@@ -194,7 +200,8 @@ impl AiChat {
 
     fn send(&mut self) {
         let text = self.input.trim().to_owned();
-        if text.is_empty() || self.streaming.is_some() || !matches!(self.model, ModelStatus::Ready) {
+        if text.is_empty() || self.streaming.is_some() || !matches!(self.model, ModelStatus::Ready)
+        {
             return;
         }
 
@@ -214,7 +221,10 @@ impl AiChat {
             role: Role::User,
             content: text.clone(),
         };
-        if self.check(self.store.add_message(chat_id, &message)).is_none() {
+        if self
+            .check(self.store.add_message(chat_id, &message))
+            .is_none()
+        {
             return;
         }
         self.messages.push(message);
@@ -245,7 +255,8 @@ impl AiChat {
 
     fn chat_list(&mut self, ui: &mut egui::Ui) {
         ui.add_space(8.0);
-        let new_chat = egui::Button::new("+ New chat").min_size(egui::vec2(ui.available_width(), 28.0));
+        let new_chat =
+            egui::Button::new("+ New chat").min_size(egui::vec2(ui.available_width(), 28.0));
         if ui.add(new_chat).clicked() {
             self.new_chat();
         }
@@ -253,14 +264,16 @@ impl AiChat {
         ui.separator();
 
         let mut action = None;
-        egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
-            for chat in &self.chats {
-                let selected = self.current == Some(chat.id);
-                if let Some(a) = chat_row(ui, chat, selected, &mut self.renaming) {
-                    action = Some(a);
+        egui::ScrollArea::vertical()
+            .auto_shrink(false)
+            .show(ui, |ui| {
+                for chat in &self.chats {
+                    let selected = self.current == Some(chat.id);
+                    if let Some(a) = chat_row(ui, chat, selected, &mut self.renaming) {
+                        action = Some(a);
+                    }
                 }
-            }
-        });
+            });
         if let Some(action) = action {
             self.apply(action);
         }
@@ -290,14 +303,20 @@ impl AiChat {
             let can_send = self.streaming.is_none();
             let send_width = 70.0;
             let input = ui.add_sized(
-                [ui.available_width() - send_width - ui.spacing().item_spacing.x, 32.0],
+                [
+                    ui.available_width() - send_width - ui.spacing().item_spacing.x,
+                    32.0,
+                ],
                 egui::TextEdit::singleline(&mut self.input)
                     .hint_text("Ask something...")
                     .align(egui::Align2::LEFT_CENTER),
             );
             let entered = input.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
             let clicked = ui
-                .add_enabled(can_send, egui::Button::new("Send").min_size([send_width, 32.0].into()))
+                .add_enabled(
+                    can_send,
+                    egui::Button::new("Send").min_size([send_width, 32.0].into()),
+                )
                 .clicked();
             if entered || clicked {
                 self.send();
@@ -378,7 +397,11 @@ fn chat_row(
         let edit = ui.add(egui::TextEdit::singleline(title).desired_width(f32::INFINITY));
         if edit.lost_focus() {
             let cancelled = ui.input(|i| i.key_pressed(egui::Key::Escape));
-            return Some(if cancelled { ChatAction::CancelRename } else { ChatAction::FinishRename });
+            return Some(if cancelled {
+                ChatAction::CancelRename
+            } else {
+                ChatAction::FinishRename
+            });
         }
         if !edit.has_focus() {
             edit.request_focus();
@@ -392,7 +415,9 @@ fn chat_row(
     let mut action = None;
     let row = egui::Layout::right_to_left(egui::Align::Center);
     ui.allocate_ui_with_layout(egui::vec2(ui.available_width(), 24.0), row, |ui| {
-        ui.menu_button("...", |ui| action = chat_menu(ui, chat.id).or(action.take()));
+        ui.menu_button("...", |ui| {
+            action = chat_menu(ui, chat.id).or(action.take())
+        });
 
         let title_width = ui.available_width();
         let title = ui
@@ -460,7 +485,10 @@ mod tests {
     /// Renders the chat list panel for several frames and returns its width each frame.
     fn panel_widths(title: &str) -> Vec<f32> {
         let ctx = egui::Context::default();
-        let chat = ChatSummary { id: 1, title: title.to_owned() };
+        let chat = ChatSummary {
+            id: 1,
+            title: title.to_owned(),
+        };
         let mut renaming = None;
         let mut widths = Vec::new();
         for _ in 0..20 {
@@ -470,9 +498,11 @@ mod tests {
                     .default_size(220.0)
                     .size_range(160.0..=400.0)
                     .show(ui, |ui| {
-                        egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
-                            chat_row(ui, &chat, true, &mut renaming);
-                        });
+                        egui::ScrollArea::vertical()
+                            .auto_shrink(false)
+                            .show(ui, |ui| {
+                                chat_row(ui, &chat, true, &mut renaming);
+                            });
                     });
                 widths.push(panel.response.rect.width());
             });

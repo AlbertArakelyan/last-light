@@ -94,7 +94,8 @@ impl Store {
     }
 
     pub fn delete_chat(&self, id: i64) -> Result<()> {
-        self.conn.execute("DELETE FROM chats WHERE id = ?1", params![id])?;
+        self.conn
+            .execute("DELETE FROM chats WHERE id = ?1", params![id])?;
         Ok(())
     }
 
@@ -147,7 +148,10 @@ mod tests {
     }
 
     fn user(content: &str) -> Message {
-        Message { role: Role::User, content: content.to_owned() }
+        Message {
+            role: Role::User,
+            content: content.to_owned(),
+        }
     }
 
     #[test]
@@ -155,7 +159,15 @@ mod tests {
         let store = store();
         let id = store.create_chat("Water").unwrap();
         store.add_message(id, &user("first")).unwrap();
-        store.add_message(id, &Message { role: Role::Assistant, content: "second".to_owned() }).unwrap();
+        store
+            .add_message(
+                id,
+                &Message {
+                    role: Role::Assistant,
+                    content: "second".to_owned(),
+                },
+            )
+            .unwrap();
         let messages = store.messages(id).unwrap();
         assert_eq!(messages.len(), 2);
         assert_eq!(messages[0].content, "first");
