@@ -1,5 +1,7 @@
 # Last Light
 
+![Last Light main screen with mini app cards](docs/screenshot.png)
+
 An offline survival toolkit for the desktop. When the internet is gone and all that's left is a laptop, Last Light gives you a handful of dependable mini apps that run entirely on that machine. They include a text editor and an AI chat powered by a small language model running locally.
 
 Built with Rust and [egui](https://github.com/emilk/egui). The AI runs on [llama.cpp](https://github.com/ggml-org/llama.cpp) through the [`llama-cpp-2`](https://crates.io/crates/llama-cpp-2) bindings. See [`SPEC.md`](SPEC.md) for the product concept.
