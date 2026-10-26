@@ -1,3 +1,5 @@
+mod ai_chat;
+
 use eframe::egui;
 
 /// A mini app shown as a card on the main screen.
@@ -40,7 +42,7 @@ impl MiniApp for Placeholder {
 pub fn all() -> Vec<Box<dyn MiniApp>> {
     vec![
         Box::new(Placeholder::new("Text Editor", "Write and save plain-text notes.")),
-        Box::new(Placeholder::new("AI Chat", "Talk to a local AI model, fully offline.")),
+        Box::new(ai_chat::AiChat::new()),
         Box::new(Placeholder::new("Journal", "Keep a dated log of each day.")),
         Box::new(Placeholder::new("Calculator", "Numbers and unit conversions.")),
         Box::new(Placeholder::new("Survival Guide", "Offline first aid and survival reference.")),

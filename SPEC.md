@@ -41,6 +41,18 @@ Last Light is a post-apocalyptic survival toolkit for the desktop. The scenario:
 - The app shell keeps the current screen: either the card grid or one open mini app.
 - App data is stored under a local data directory.
 
+## Building
+
+End users install nothing: the exe statically links llama.cpp and the C runtime, and depends only on DLLs that ship with Windows. Ship `last-light.exe` together with its `assets/` folder.
+
+Developers building from source need, once per machine:
+- MSVC and CMake (both come with Visual Studio's C++ workload).
+- LLVM for libclang (`scoop install llvm`), used to generate the llama.cpp bindings.
+- Environment variables `LIBCLANG_PATH` (LLVM's `bin` folder) and `CMAKE` (path to `cmake.exe`) if CMake isn't on `PATH`.
+- The model at `assets/models/qwen3.5-0.8b-q8_0.gguf` (not in git).
+
+`.cargo/config.toml` and `cmake/static-crt.cmake` force the static runtime. If you change them, run `cargo clean -p llama-cpp-sys-2` so llama.cpp is rebuilt.
+
 ## Open questions
 
 - Which local model and inference runtime the AI Chat will use (e.g. a GGUF model via llama.cpp bindings).

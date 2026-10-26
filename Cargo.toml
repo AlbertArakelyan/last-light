@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 eframe = "0.37.0"
+llama-cpp-2 = { version = "0.1.160", default-features = false }
