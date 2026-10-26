@@ -57,3 +57,19 @@ The shipped app is `last-light.exe` plus its `assets/` folder. It must run with 
 ## Repo conventions
 
 Commit directly on `main`; this is a solo, local repo, so don't create feature branches.
+
+## Claude Code setup (`.claude/`)
+
+- **Skills:**
+  - `add-mini-app`: new mini apps.
+  - `egui-ui`: egui 0.37 APIs and the layout pitfalls already hit here; read it before writing UI.
+  - `local-llm`: model, prompt and llama-cpp-2 changes.
+  - `verify-zero-install`: dependency check after adding native deps.
+  - `release`: packaging.
+- **Agents:**
+  - `rust-reviewer`: read-only review of a diff against the project constraints.
+  - `crate-api-researcher`: exact APIs for the locked crate versions, from registry source and Context7.
+- **Hooks:**
+  - After any edit to a `.rs` file, `cargo fmt` runs. A syntax error comes back as a hook error, so fix the code rather than fighting the formatter.
+  - On session start, a check flags a missing model file or a missing `.mcp.json`.
+- **MCP:** Context7 (docs lookup) is configured in `.mcp.json`. That file and `.claude/settings.local.json` are gitignored because they may hold tokens. `.mcp.example.json` is the committed, token-free copy, so update it whenever you change `.mcp.json`.

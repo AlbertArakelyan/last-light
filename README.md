@@ -123,6 +123,16 @@ cargo test -- --include-ignored --nocapture  # also tests that load the model
 cargo test remembers_earlier_messages -- --ignored --nocapture   # a single test
 ```
 
+### Claude Code
+
+The repo includes a shared Claude Code setup in `.claude/`, with skills, agents, hooks and permissions. See the "Claude Code setup" section of [`CLAUDE.md`](CLAUDE.md). To enable the Context7 docs MCP, copy the example config:
+
+```sh
+cp .mcp.example.json .mcp.json
+```
+
+`.mcp.json` and `.claude/settings.local.json` are gitignored. Put API keys and personal overrides there, never in the committed files.
+
 ### Packaging a release
 
 Copy the release binary and the `assets/` folder from `target/release/` together:

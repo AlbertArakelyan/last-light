@@ -1,2 +1,6 @@
 /target
 *.gguf
+
+# Local Claude Code / MCP config (may hold tokens); see .mcp.example.json
+.claude/settings.local.json
+.mcp.json
