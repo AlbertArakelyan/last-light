@@ -94,7 +94,15 @@ The build normally finds libclang in the Command Line Tools automatically. If it
 
 ### 2. Get the model
 
-The AI model isn't stored in git because of its size (774 MB). Download the Q8_0 GGUF of Qwen3.5 0.8B and save it as `assets/models/qwen3.5-0.8b-q8_0.gguf`:
+The AI model isn't stored in git because of its size (774 MB). The rest of the app works without it; only AI Chat needs it.
+
+1. Download [`Qwen3.5 0.8B Q8_0 (2026)[Romarchive].gguf`](https://huggingface.co/Romarchive/Qwen3.5-0.8B-GGUF/blob/main/Qwen3.5%200.8B%20Q8_0%20(2026)%5BRomarchive%5D.gguf) from Hugging Face (the download button is on that page).
+2. Put it in the `assets/models/` folder (create the folder if it doesn't exist).
+3. Rename it to `qwen3.5-0.8b-q8_0.gguf`. This is the file name the app looks for.
+
+The result should be `assets/models/qwen3.5-0.8b-q8_0.gguf`.
+
+Or do all three steps from a terminal:
 
 ```sh
 mkdir -p assets/models
@@ -102,7 +110,10 @@ curl -L -o assets/models/qwen3.5-0.8b-q8_0.gguf \
   "https://huggingface.co/Romarchive/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5%200.8B%20Q8_0%20(2026)%5BRomarchive%5D.gguf"
 ```
 
-On Windows, `curl.exe` ships with Windows 10 and later; in PowerShell call it as `curl.exe` so you don't get the `Invoke-WebRequest` alias. The rest of the app works without the model; only AI Chat needs it.
+On Windows, `curl.exe` ships with Windows 10 and later; in PowerShell call it as `curl.exe` so you don't get the `Invoke-WebRequest` alias.
+
+> [!NOTE]
+> You can download and use any model for development, for example a smaller one to save disk space or a bigger one to try out. The model must be a GGUF that llama.cpp supports and has a chat template. Either save it under the name above, or point `MODEL_FILE` in `src/apps/ai_chat/worker.rs` at your file. The `<think>` prefill in `worker.rs` is meant for Qwen-style models, and other models may need prompt tweaks; see `.claude/skills/local-llm/SKILL.md`. Don't commit a changed `MODEL_FILE` unless the shipped model is changing too.
 
 ### 3. Build and run
 
