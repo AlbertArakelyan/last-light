@@ -10,7 +10,8 @@ use eframe::egui;
 use egui_commonmark::{CommonMarkCache, CommonMarkViewer};
 
 use super::MiniApp;
-use super::widgets::{InputOutcome, RowAction, inline_input, list_row};
+use super::widgets::{InputOutcome, RowAction, inline_input, list_row, section_header};
+use crate::theme;
 use store::{DEFAULT_FOLDER, NotesStore};
 
 /// How long typing must pause before the note is saved.
@@ -318,7 +319,7 @@ impl TextEditor {
 
     fn folders_panel(&mut self, ui: &mut egui::Ui) {
         let mut action = None;
-        if panel_header(ui, "Folders", "New folder", true) {
+        if section_header(ui, "Folders", "New folder", true) {
             action = Some(SidebarAction::StartEditing(Editing::NewFolder(
                 String::new(),
             )));
@@ -365,7 +366,7 @@ impl TextEditor {
     fn notes_panel(&mut self, ui: &mut egui::Ui) {
         let mut action = None;
         let title = self.folder.clone().unwrap_or_else(|| "Notes".to_owned());
-        if panel_header(ui, &title, "New note", self.folder.is_some()) {
+        if section_header(ui, &title, "New note", self.folder.is_some()) {
             action = Some(SidebarAction::StartEditing(Editing::NewNote(String::new())));
         }
         if let Some(Editing::NewNote(text)) = &mut self.editing
@@ -412,72 +413,88 @@ impl TextEditor {
     }
 
     fn toolbar(&mut self, ui: &mut egui::Ui) {
-        ui.add_space(4.0);
         ui.horizontal(|ui| {
-            let sidebar = egui::Button::selectable(self.show_sidebar, "Sidebar");
-            if ui
-                .add(sidebar)
-                .on_hover_text("Show or hide folders and notes")
-                .clicked()
-            {
+            let sidebar = if self.show_sidebar {
+                "Hide sidebar"
+            } else {
+                "Show sidebar"
+            };
+            if ui.add(theme::quiet_button(sidebar)).clicked() {
                 self.show_sidebar = !self.show_sidebar;
             }
             ui.separator();
 
-            // Right to left so the mode buttons keep their size and the note
+            // Right to left so the mode switch keeps its size and the note
             // title is truncated to whatever space is left.
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                for mode in Mode::ALL.into_iter().rev() {
-                    let button = egui::Button::selectable(self.mode == mode, mode.label());
-                    if ui.add_enabled(self.open.is_some(), button).clicked() {
-                        self.mode = mode;
-                    }
+                let modes = Mode::ALL.map(|mode| (mode, mode.label()));
+                if let Some(mode) = theme::segmented(ui, self.open.is_some(), self.mode, &modes) {
+                    self.mode = mode;
                 }
                 if let Some(note) = &self.open {
-                    let status = if note.unsaved_since.is_some() {
-                        "Saving..."
-                    } else {
-                        "Saved"
+                    let (status, color) = match note.unsaved_since {
+                        Some(_) => ("Saving...", theme::ACCENT),
+                        None => ("Saved", theme::TEXT_FAINT),
                     };
-                    ui.weak(status);
+                    ui.add_space(6.0);
+                    ui.label(egui::RichText::new(status).small().color(color));
                     ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                        let title = format!("{} / {}", note.folder, note.name);
-                        ui.add(egui::Label::new(egui::RichText::new(title).strong()).truncate());
+                        let mut path = egui::text::LayoutJob::default();
+                        let font = egui::FontId::proportional(14.5);
+                        let part = |color| egui::TextFormat::simple(font.clone(), color);
+                        path.append(&format!("{} / ", note.folder), 0.0, part(theme::TEXT_FAINT));
+                        path.append(&note.name, 0.0, part(theme::TEXT_STRONG));
+                        ui.add(egui::Label::new(path).truncate());
                     });
                 }
             });
         });
         if let Some(notice) = self.notice.clone() {
+            ui.add_space(4.0);
             ui.horizontal(|ui| {
-                if ui.small_button("x").on_hover_text("Dismiss").clicked() {
+                if ui
+                    .add(theme::quiet_button("x"))
+                    .on_hover_text("Dismiss")
+                    .clicked()
+                {
                     self.notice = None;
                 }
-                ui.add(
-                    egui::Label::new(egui::RichText::new(notice).color(ui.visuals().warn_fg_color))
-                        .wrap(),
-                );
+                ui.add(egui::Label::new(egui::RichText::new(notice).color(theme::WARN)).wrap());
             });
         }
-        ui.add_space(4.0);
     }
 
     fn editor(&mut self, ui: &mut egui::Ui) {
         let Some(note) = &mut self.open else {
-            ui.centered_and_justified(|ui| {
-                ui.weak("Select a note, or create one with + in the sidebar.");
+            ui.vertical_centered(|ui| {
+                ui.add_space(ui.available_height() / 3.0);
+                theme::lamp(ui, 36.0);
+                ui.add_space(6.0);
+                ui.label(
+                    egui::RichText::new("No note open")
+                        .size(17.0)
+                        .color(theme::TEXT),
+                );
+                ui.label(
+                    egui::RichText::new("Pick a note from the sidebar, or create one with +.")
+                        .color(theme::TEXT_MUTED),
+                );
             });
             return;
         };
         let changed = match self.mode {
             Mode::Edit => edit_pane(ui, note),
             Mode::View => preview_pane(ui, &mut self.preview_cache, note),
-            Mode::Split => ui.columns(2, |columns| {
-                let [left, right] = columns else {
-                    unreachable!("two columns")
-                };
-                let edited = edit_pane(left, note);
-                preview_pane(right, &mut self.preview_cache, note) || edited
-            }),
+            Mode::Split => {
+                ui.spacing_mut().item_spacing.x = 16.0;
+                ui.columns(2, |columns| {
+                    let [left, right] = columns else {
+                        unreachable!("two columns")
+                    };
+                    let edited = edit_pane(left, note);
+                    preview_pane(right, &mut self.preview_cache, note) || edited
+                })
+            }
         };
         if changed {
             note.unsaved_since = Some(Instant::now());
@@ -509,8 +526,13 @@ impl TextEditor {
             ui.label(body);
             ui.add_space(12.0);
             ui.horizontal(|ui| {
-                let delete = egui::RichText::new("Delete").color(ui.visuals().error_fg_color);
-                if ui.button(delete).clicked() {
+                let delete = egui::RichText::new("Delete")
+                    .strong()
+                    .color(theme::TEXT_STRONG);
+                if ui
+                    .add(egui::Button::new(delete).fill(theme::DANGER))
+                    .clicked()
+                {
                     decision = Some(true);
                 }
                 if ui.button("Cancel").clicked() {
@@ -550,19 +572,40 @@ impl MiniApp for TextEditor {
         self.autosave(ui.ctx());
 
         if self.show_sidebar {
+            // The folders column sits a shade darker than the notes column,
+            // so the two read as levels rather than one wide list.
+            let column = |fill| {
+                egui::Frame::new()
+                    .fill(fill)
+                    .inner_margin(egui::Margin::symmetric(10, 4))
+            };
             egui::Panel::left("notes_folders")
                 .resizable(true)
                 .default_size(150.0)
                 .size_range(110.0..=260.0)
+                .frame(column(theme::BG))
                 .show(ui, |ui| self.folders_panel(ui));
             egui::Panel::left("notes_list")
                 .resizable(true)
                 .default_size(200.0)
                 .size_range(140.0..=360.0)
+                .frame(column(theme::PANEL))
                 .show(ui, |ui| self.notes_panel(ui));
         }
-        egui::Panel::top("notes_toolbar").show(ui, |ui| self.toolbar(ui));
-        egui::CentralPanel::default().show(ui, |ui| self.editor(ui));
+        egui::Panel::top("notes_toolbar")
+            .frame(
+                egui::Frame::new()
+                    .fill(theme::BG)
+                    .inner_margin(egui::Margin::symmetric(16, 8)),
+            )
+            .show(ui, |ui| self.toolbar(ui));
+        egui::CentralPanel::default()
+            .frame(
+                egui::Frame::new()
+                    .fill(theme::BG)
+                    .inner_margin(egui::Margin::symmetric(16, 12)),
+            )
+            .show(ui, |ui| self.editor(ui));
 
         self.confirm_dialog(ui.ctx());
     }
@@ -579,27 +622,6 @@ impl Drop for TextEditor {
     }
 }
 
-/// A sidebar panel's title with a "+" button; returns true when "+" is clicked.
-fn panel_header(ui: &mut egui::Ui, title: &str, add_hint: &str, can_add: bool) -> bool {
-    ui.add_space(6.0);
-    let mut clicked = false;
-    ui.allocate_ui_with_layout(
-        egui::vec2(ui.available_width(), 20.0),
-        egui::Layout::right_to_left(egui::Align::Center),
-        |ui| {
-            clicked = ui
-                .add_enabled(can_add, egui::Button::new("+").small())
-                .on_hover_text(add_hint)
-                .clicked();
-            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                ui.add(egui::Label::new(egui::RichText::new(title).strong()).truncate());
-            });
-        },
-    );
-    ui.separator();
-    clicked
-}
-
 fn finish_or_cancel(outcome: InputOutcome) -> SidebarAction {
     match outcome {
         InputOutcome::Commit => SidebarAction::FinishEditing,
@@ -613,10 +635,12 @@ fn edit_pane(ui: &mut egui::Ui, note: &mut OpenNote) -> bool {
         .id_salt("note_source")
         .auto_shrink(false)
         .show(ui, |ui| {
+            // Frameless: the source reads as a writing surface, not a form field.
             ui.add(
                 egui::TextEdit::multiline(&mut note.content)
                     .font(egui::TextStyle::Monospace)
                     .hint_text("Start writing Markdown...")
+                    .frame(egui::Frame::NONE)
                     .desired_width(f32::INFINITY)
                     .min_size(ui.available_size())
                     .lock_focus(true),
@@ -629,17 +653,77 @@ fn edit_pane(ui: &mut egui::Ui, note: &mut OpenNote) -> bool {
 /// The rendered Markdown. Ticking a task-list checkbox edits the source, so
 /// this returns true if the text changed.
 fn preview_pane(ui: &mut egui::Ui, cache: &mut CommonMarkCache, note: &mut OpenNote) -> bool {
-    egui::ScrollArea::vertical()
-        .id_salt("note_preview")
-        .auto_shrink(false)
+    // The rendered note sits on its own raised page.
+    egui::Frame::new()
+        .fill(theme::PANEL)
+        .stroke(egui::Stroke::new(1.0, theme::BORDER))
+        .corner_radius(10)
+        .inner_margin(egui::Margin::symmetric(20, 16))
         .show(ui, |ui| {
-            CommonMarkViewer::new()
-                .show_mut(ui, cache, &mut note.content)
-                .response
-                .changed()
+            egui::ScrollArea::vertical()
+                .id_salt("note_preview")
+                .auto_shrink(false)
+                .show(ui, |ui| {
+                    CommonMarkViewer::new()
+                        .show_mut(ui, cache, &mut note.content)
+                        .response
+                        .changed()
+                })
+                .inner
         })
         .inner
 }
+
+#[cfg(test)]
+impl TextEditor {
+    /// An editor over sample notes in `root`, with one note open in Split mode.
+    pub(super) fn demo(root: &std::path::Path) -> Self {
+        let store = NotesStore::at(root.join("notes"));
+        store.init().unwrap();
+        let notes = [
+            ("Water", "Purifying river water", DEMO_NOTE),
+            ("Water", "Rainwater collection", "# Rainwater\n"),
+            ("Water", "Wells nearby", "# Wells\n"),
+            ("Food", "Pantry", "# Pantry\n"),
+            ("Food", "Foraging", "# Foraging\n"),
+            ("Shelter", "Repairs", "# Repairs\n"),
+            (DEFAULT_FOLDER, "Ideas", "# Ideas\n"),
+        ];
+        for (folder, name, content) in notes {
+            if !store.folders().unwrap().iter().any(|f| f == folder) {
+                store.create_folder(folder).unwrap();
+            }
+            store.create_note(folder, name).unwrap();
+            store.write_note(folder, name, content).unwrap();
+        }
+        let mut editor = Self::with_store(store, None);
+        editor.select_folder("Water".to_owned());
+        editor.open_note("Purifying river water".to_owned());
+        editor
+    }
+}
+
+#[cfg(test)]
+const DEMO_NOTE: &str = "# Purifying river water
+
+Collect from **moving water**, upstream of any camp.
+
+## Steps
+
+- [x] Let sediment settle for an hour
+- [x] Pour through a cloth into a clean pot
+- [ ] Bring to a rolling boil for `1 minute`
+- [ ] Store covered, away from sunlight
+
+## Fuel per litre
+
+| Method | Time | Fuel |
+|---|---|---|
+| Boiling | 1 min | Wood |
+| Sun (SODIS) | 6 h | None |
+
+> Above 2,000 m, boil for 3 minutes.
+";
 
 #[cfg(test)]
 mod tests {

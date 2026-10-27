@@ -11,4 +11,6 @@ llama-cpp-2 = { version = "0.1.160", default-features = false }
 rusqlite = { version = "0.41.0", features = ["bundled"] }
 
 [dev-dependencies]
+egui_kittest = { version = "0.37.0", features = ["snapshot", "wgpu"] }
+image = { version = "0.25.10", default-features = false, features = ["png"] }
 tempfile = "3.27.0"

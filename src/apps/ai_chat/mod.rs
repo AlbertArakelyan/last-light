@@ -7,7 +7,8 @@ mod worker;
 use eframe::egui;
 
 use super::MiniApp;
-use super::widgets::{RowAction, list_row};
+use super::widgets::{RowAction, list_row, section_header};
+use crate::theme;
 use store::{ChatSummary, Store};
 use worker::{Event, Request, Worker};
 
@@ -255,14 +256,9 @@ impl AiChat {
     }
 
     fn chat_list(&mut self, ui: &mut egui::Ui) {
-        ui.add_space(8.0);
-        let new_chat =
-            egui::Button::new("+ New chat").min_size(egui::vec2(ui.available_width(), 28.0));
-        if ui.add(new_chat).clicked() {
+        if section_header(ui, "Chats", "New chat", true) {
             self.new_chat();
         }
-        ui.add_space(4.0);
-        ui.separator();
 
         let mut action = None;
         egui::ScrollArea::vertical()
@@ -274,6 +270,9 @@ impl AiChat {
                         action = Some(a);
                     }
                 }
+                if self.chats.is_empty() {
+                    ui.label(egui::RichText::new("No chats yet.").color(theme::TEXT_FAINT));
+                }
             });
         if let Some(action) = action {
             self.apply(action);
@@ -281,49 +280,64 @@ impl AiChat {
     }
 
     fn input_area(&mut self, ui: &mut egui::Ui) {
-        if let Some(notice) = &self.notice {
-            ui.colored_label(ui.visuals().warn_fg_color, notice);
-            ui.add_space(4.0);
-        }
-        match &self.model {
-            ModelStatus::Loading => {
+        reading_column(ui, |ui| {
+            if let Some(notice) = self.notice.clone() {
                 ui.horizontal(|ui| {
-                    ui.spinner();
-                    ui.label("Loading model...");
+                    if ui
+                        .add(theme::quiet_button("x"))
+                        .on_hover_text("Dismiss")
+                        .clicked()
+                    {
+                        self.notice = None;
+                    }
+                    ui.add(egui::Label::new(egui::RichText::new(notice).color(theme::WARN)).wrap());
                 });
+                ui.add_space(4.0);
             }
-            ModelStatus::Failed(err) => {
-                ui.colored_label(ui.visuals().error_fg_color, err);
+            match &self.model {
+                ModelStatus::Loading => {
+                    ui.horizontal(|ui| {
+                        ui.spinner();
+                        ui.label(egui::RichText::new("Loading model...").color(theme::TEXT_MUTED));
+                    });
+                }
+                ModelStatus::Failed(err) => {
+                    ui.label(egui::RichText::new(err).color(theme::ERROR));
+                }
+                ModelStatus::Ready => self.input_bar(ui),
             }
-            ModelStatus::Ready => self.input_bar(ui),
-        }
+        });
     }
 
     fn input_bar(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            let can_send = self.streaming.is_none();
-            let send_width = 70.0;
-            let input = ui.add_sized(
-                [
-                    ui.available_width() - send_width - ui.spacing().item_spacing.x,
-                    32.0,
-                ],
-                egui::TextEdit::singleline(&mut self.input)
-                    .hint_text("Ask something...")
-                    .align(egui::Align2::LEFT_CENTER),
-            );
-            let entered = input.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-            let clicked = ui
-                .add_enabled(
-                    can_send,
-                    egui::Button::new("Send").min_size([send_width, 32.0].into()),
-                )
-                .clicked();
-            if entered || clicked {
-                self.send();
-                input.request_focus();
-            }
-        });
+        egui::Frame::new()
+            .fill(theme::RAISED)
+            .stroke(egui::Stroke::new(1.0, theme::BORDER))
+            .corner_radius(12)
+            .inner_margin(egui::Margin::symmetric(12, 6))
+            .show(ui, |ui| {
+                // Right to left so Send keeps its size and the field takes the rest.
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let can_send = self.streaming.is_none() && !self.input.trim().is_empty();
+                    let send = ui.add_enabled(
+                        can_send,
+                        theme::primary_button("Send").min_size(egui::vec2(64.0, 30.0)),
+                    );
+                    let input = ui.add(
+                        egui::TextEdit::singleline(&mut self.input)
+                            .hint_text("Ask something...")
+                            .frame(egui::Frame::NONE)
+                            .desired_width(ui.available_width())
+                            .align(egui::Align2::LEFT_CENTER),
+                    );
+                    let entered =
+                        input.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                    if entered || send.clicked() {
+                        self.send();
+                        input.request_focus();
+                    }
+                });
+            });
     }
 
     fn message_list(&self, ui: &mut egui::Ui) {
@@ -332,8 +346,19 @@ impl AiChat {
             .as_ref()
             .filter(|s| Some(s.chat_id) == self.current);
         if self.messages.is_empty() && streaming.is_none() {
-            ui.centered_and_justified(|ui| {
-                ui.weak("Ask anything. Everything runs on this laptop.");
+            ui.vertical_centered(|ui| {
+                ui.add_space(ui.available_height() / 3.0);
+                theme::lamp(ui, 40.0);
+                ui.add_space(8.0);
+                ui.label(
+                    egui::RichText::new("Ask anything")
+                        .size(19.0)
+                        .color(theme::TEXT_STRONG),
+                );
+                ui.label(
+                    egui::RichText::new("The model runs on this laptop. Nothing leaves it.")
+                        .color(theme::TEXT_MUTED),
+                );
             });
             return;
         }
@@ -342,12 +367,16 @@ impl AiChat {
             .auto_shrink(false)
             .stick_to_bottom(true)
             .show(ui, |ui| {
-                for message in &self.messages {
-                    message_ui(ui, message.role, &message.content);
-                }
-                if let Some(streaming) = streaming {
-                    message_ui(ui, Role::Assistant, &streaming.text);
-                }
+                reading_column(ui, |ui| {
+                    ui.add_space(8.0);
+                    for message in &self.messages {
+                        message_ui(ui, message.role, &message.content);
+                    }
+                    if let Some(streaming) = streaming {
+                        message_ui(ui, Role::Assistant, &streaming.text);
+                    }
+                    ui.add_space(8.0);
+                });
             });
     }
 }
@@ -372,15 +401,29 @@ impl MiniApp for AiChat {
             .resizable(true)
             .default_size(220.0)
             .size_range(160.0..=400.0)
+            .frame(
+                egui::Frame::new()
+                    .fill(theme::PANEL)
+                    .inner_margin(egui::Margin::symmetric(10, 4)),
+            )
             .show(ui, |ui| self.chat_list(ui));
 
-        egui::Panel::bottom("chat_input").show(ui, |ui| {
-            ui.add_space(8.0);
-            self.input_area(ui);
-            ui.add_space(8.0);
-        });
+        egui::Panel::bottom("chat_input")
+            .show_separator_line(false)
+            .frame(
+                egui::Frame::new()
+                    .fill(theme::BG)
+                    .inner_margin(egui::Margin::symmetric(20, 14)),
+            )
+            .show(ui, |ui| self.input_area(ui));
 
-        egui::CentralPanel::default().show(ui, |ui| self.message_list(ui));
+        egui::CentralPanel::default()
+            .frame(
+                egui::Frame::new()
+                    .fill(theme::BG)
+                    .inner_margin(egui::Margin::symmetric(20, 0)),
+            )
+            .show(ui, |ui| self.message_list(ui));
     }
 }
 
@@ -404,18 +447,61 @@ fn chat_row(
     })
 }
 
+/// Messages and the input share one centered column, so long lines stay
+/// readable on wide windows.
+const READING_WIDTH: f32 = 760.0;
+
+fn reading_column(ui: &mut egui::Ui, add_contents: impl FnOnce(&mut egui::Ui)) {
+    let width = ui.available_width().min(READING_WIDTH);
+    let side = ((ui.available_width() - width) / 2.0).max(0.0);
+    ui.horizontal(|ui| {
+        ui.add_space(side);
+        ui.vertical(|ui| {
+            ui.set_width(width);
+            add_contents(ui);
+        });
+    });
+}
+
+/// One message as a bubble: the user's on the right in amber, the AI's on the
+/// left next to the lamp.
 fn message_ui(ui: &mut egui::Ui, role: Role, text: &str) {
-    let (who, color) = match role {
-        Role::User => ("You", ui.visuals().strong_text_color()),
-        Role::Assistant | Role::System => ("AI", ui.visuals().hyperlink_color),
+    const PADDING: egui::Vec2 = egui::vec2(14.0, 10.0);
+    const LAMP: f32 = 22.0;
+    let is_user = role == Role::User;
+
+    // Lay the text out first so the bubble can hug it, then push the user's
+    // bubble to the right by the space left over.
+    let (text, color) = match text {
+        "" => ("Thinking...", theme::TEXT_FAINT),
+        text => (text, theme::TEXT),
     };
-    ui.label(egui::RichText::new(who).strong().color(color));
-    if text.is_empty() {
-        ui.weak("Thinking...");
-    } else {
-        ui.label(text);
-    }
-    ui.add_space(12.0);
+    let max_text_width = ui.available_width() * 0.78 - 2.0 * PADDING.x;
+    let galley = ui.painter().layout(
+        text.to_owned(),
+        egui::TextStyle::Body.resolve(ui.style()),
+        color,
+        max_text_width,
+    );
+    let bubble_width = galley.size().x + 2.0 * PADDING.x;
+
+    ui.horizontal_top(|ui| {
+        if is_user {
+            ui.add_space(ui.available_width() - bubble_width);
+        } else {
+            theme::lamp(ui, LAMP);
+        }
+        egui::Frame::new()
+            .fill(if is_user {
+                theme::ACCENT_SOFT
+            } else {
+                theme::RAISED
+            })
+            .corner_radius(12)
+            .inner_margin(egui::Margin::symmetric(PADDING.x as i8, PADDING.y as i8))
+            .show(ui, |ui| ui.add(egui::Label::new(galley)));
+    });
+    ui.add_space(10.0);
 }
 
 /// First line of `text`, shortened to fit in the chat list.
@@ -424,5 +510,76 @@ fn truncate_title(text: &str) -> String {
     match line.char_indices().nth(TITLE_MAX_CHARS) {
         Some((end, _)) => format!("{}...", line[..end].trim_end()),
         None => line.to_owned(),
+    }
+}
+
+#[cfg(test)]
+impl AiChat {
+    /// A chat app over sample conversations in an in-memory database, with
+    /// the first chat open. The model is never loaded.
+    pub(super) fn demo() -> Self {
+        let store = Store::in_memory();
+        let chats: [(&str, &[(Role, &str)]); 4] = [
+            ("Morse code basics", &[(Role::User, "How do I signal SOS?")]),
+            (
+                "Wild edible plants",
+                &[(Role::User, "Which plants are safe?")],
+            ),
+            (
+                "Fixing a bike chain",
+                &[(Role::User, "My chain keeps slipping.")],
+            ),
+            (
+                "Purifying river water",
+                &[
+                    (
+                        Role::User,
+                        "How do I make river water safe to drink without a filter?",
+                    ),
+                    (
+                        Role::Assistant,
+                        "Boil it. Let the sediment settle, pour the clear water through a clean \
+                         cloth, then keep it at a rolling boil for one minute (three minutes \
+                         above 2,000 m). Let it cool covered.",
+                    ),
+                    (Role::User, "And if I have no fuel?"),
+                    (
+                        Role::Assistant,
+                        "Use sunlight: fill clear plastic bottles, lay them on a reflective \
+                         surface in full sun for at least six hours, or two days if it's cloudy. \
+                         It works best on water that's already clear.",
+                    ),
+                ],
+            ),
+        ];
+        for (title, messages) in chats {
+            let id = store.create_chat(title).unwrap();
+            for &(role, content) in messages {
+                let message = Message {
+                    role,
+                    content: content.to_owned(),
+                };
+                store.add_message(id, &message).unwrap();
+            }
+        }
+
+        let mut app = Self {
+            store,
+            worker: Some(Worker::idle()),
+            model: ModelStatus::Ready,
+            chats: Vec::new(),
+            current: None,
+            messages: Vec::new(),
+            streaming: None,
+            renaming: None,
+            notice: None,
+            input: String::new(),
+        };
+        app.refresh_chats();
+        let first = app.chats.first().map(|c| c.id);
+        if let Some(id) = first {
+            app.apply(ChatAction::Open(id));
+        }
+        app
     }
 }

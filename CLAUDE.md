@@ -13,7 +13,10 @@ cargo check                          # type-check; works even while the app is r
 cargo test                           # unit tests
 cargo test -- --ignored --nocapture  # also run tests that need the model file (prints replies)
 cargo test remembers_earlier_messages -- --ignored --nocapture   # run one test by name
+cargo test render_screenshots -- --ignored   # render each screen with sample data to target/screenshots/*.png
 ```
+
+- **Checking UI changes:** run `render_screenshots` and look at the PNGs. It draws the real shell and apps through `egui_kittest` (dev-dependency only), using `apps::demo()`. That gives each app sample data in a temp folder or in-memory DB, with no model loaded, so it never touches the user's notes or chats. Simulated clicks on the real window are unreliable when it isn't focused, so prefer this.
 
 - **Locked exe:** if `cargo build` fails with "failed to remove file ... last-light.exe", the app is still running. Close it, or use `cargo check`.
 - **First build is slow:** about 2 minutes, because `llama-cpp-sys-2` compiles llama.cpp from source. It needs MSVC, CMake and libclang. `LIBCLANG_PATH` (LLVM `bin`, installed via `scoop install llvm`) and `CMAKE` (Visual Studio's `cmake.exe`) must be set in the environment.
@@ -28,8 +31,9 @@ The shipped app is `last-light.exe` plus its `assets/` folder. It must run with 
 
 ## Architecture
 
-- **App shell (`src/main.rs`):** `LastLightApp` holds `Vec<Box<dyn MiniApp>>` and `open: Option<usize>`. `None` shows the card grid. `Some(i)` renders that app, and the header shows a Back button. Cards are hand-painted (painter + galleys rather than label widgets) so their text can't steal clicks from the card.
-- **Mini apps (`src/apps/`):** every app implements the `MiniApp` trait (`name`, `description`, `ui`, plus an optional `on_close` that the shell calls on Back) and is registered in `apps::all()`. Unbuilt apps use `Placeholder`. Shared widgets live in `src/apps/widgets.rs`: `list_row` (a sidebar row with a truncated title, a "..." menu and inline rename, laid out so it can never widen its panel) and `inline_input`.
+- **App shell (`src/main.rs`):** `LastLightApp` holds `Vec<Box<dyn MiniApp>>` and `open: Option<usize>`. `None` shows the card grid. `Some(i)` renders that app, and the header shows a Back button. Cards are hand-painted (painter + galleys rather than label widgets) so their text can't steal clicks from the card. Their width stretches so each row fills the window. Apps with `is_ready() == false` (placeholders) get dimmed cards with a "Soon" badge.
+- **Theme (`src/theme.rs`):** one dark look for the whole app, warm charcoal with a single amber accent. `apply()` installs it at startup. Use its color constants (`BG`, `PANEL`, `RAISED`, `TEXT*`, `ACCENT`, ...) and helpers (`lamp`, `section_label`, `quiet_button`, `primary_button`, `segmented`) instead of egui's default colors or hard-coded `Color32`s. The full style guide is in the `egui-ui` skill.
+- **Mini apps (`src/apps/`):** every app implements the `MiniApp` trait (`name`, `description`, `ui`, plus optional `on_close`, which the shell calls on Back, and `is_ready`, false only for placeholders). Apps are registered in `apps::all()`. Unbuilt apps live in `placeholders()`. Each real app also has a test-only `demo()` constructor, registered in `apps::demo()`, which feeds the screenshot test. Shared widgets live in `src/apps/widgets.rs`: `section_header` (sidebar heading with "+"), `list_row` (a sidebar row with a truncated title, a "..." menu and inline rename, laid out so it can never widen its panel) and `inline_input`.
 - **Storage (`src/storage.rs`):** all mini apps share one SQLite database, `last-light.db`, in the per-user data folder (`%APPDATA%\Last Light`). `rusqlite` uses the `bundled` feature, so SQLite is compiled into the exe. Each app creates its own tables with `CREATE TABLE IF NOT EXISTS`.
 - **AI Chat (`src/apps/ai_chat/`):**
   - **`mod.rs` (UI state):** the chat side panel and messages.
@@ -66,7 +70,7 @@ Commit directly on `main`; this is a solo, local repo, so don't create feature b
 
 - **Skills:**
   - `add-mini-app`: new mini apps.
-  - `egui-ui`: egui 0.37 APIs and the layout pitfalls already hit here; read it before writing UI.
+  - `egui-ui`: **the visual style guide** (theme colors, helpers, panel and empty-state conventions) plus egui 0.37 APIs and the layout pitfalls already hit here; read it before writing or restyling any UI.
   - `local-llm`: model, prompt and llama-cpp-2 changes.
   - `verify-zero-install`: dependency check after adding native deps.
   - `release`: packaging.

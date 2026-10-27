@@ -1,6 +1,6 @@
 ---
 name: rust-reviewer
-description: Reviews Last Light code changes (the git diff, or files named in the request) for correctness bugs and violations of the project's hard constraints (offline-only, zero install, egui 0.37 pitfalls). Use after a non-trivial change and before committing. Read-only; reports findings without editing.
+description: Reviews Last Light code changes (the git diff, or files named in the request) for correctness bugs and violations of the project's hard constraints (offline-only, zero install, egui 0.37 pitfalls, the Last Light visual style). Use after a non-trivial change and before committing. Read-only; reports findings without editing.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -29,6 +29,8 @@ Start from the diff (`git diff` and `git diff --staged`, or the files you were p
    - Selectable labels stealing clicks on custom clickable surfaces.
    - `item_spacing` changes leaking into children.
    - Deprecated or pre-0.37 APIs.
+   - Off-style UI: colors that bypass `crate::theme` (egui's `ui.visuals().…_color`, new `Color32` literals outside `theme.rs`), panels without an explicit theme `Frame`, more than one `primary_button` on a screen, a destructive action without a confirmation `Modal`, or hand-rolled sidebar rows instead of `widgets::list_row` / `section_header`. The style guide is in `.claude/skills/egui-ui/SKILL.md`.
+   - A new mini app without a `demo()` in `apps::demo()` and an entry in the `render_screenshots` test.
 5. **Persistence.**
    - SQL without parameters.
    - Missing `ON DELETE CASCADE` or `foreign_keys`.

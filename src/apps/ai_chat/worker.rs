@@ -106,6 +106,15 @@ impl Worker {
     pub fn poll(&self) -> Option<Event> {
         self.events.try_recv().ok()
     }
+
+    /// A worker with no thread or model behind it, for demos: requests go
+    /// nowhere and no events ever arrive.
+    #[cfg(test)]
+    pub fn idle() -> Self {
+        let (requests, _) = channel();
+        let (_, events) = channel();
+        Self { requests, events }
+    }
 }
 
 fn model_path() -> PathBuf {

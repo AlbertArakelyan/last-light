@@ -53,6 +53,15 @@ impl Store {
         }
     }
 
+    /// An empty database that lives only in memory, for tests and demos.
+    #[cfg(test)]
+    pub fn in_memory() -> Self {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+        conn.execute_batch(SCHEMA).unwrap();
+        Self { conn }
+    }
+
     /// All chats, most recently active first.
     pub fn chats(&self) -> Result<Vec<ChatSummary>> {
         let mut stmt = self
@@ -141,10 +150,7 @@ mod tests {
     use super::*;
 
     fn store() -> Store {
-        let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
-        conn.execute_batch(SCHEMA).unwrap();
-        Store { conn }
+        Store::in_memory()
     }
 
     fn user(content: &str) -> Message {

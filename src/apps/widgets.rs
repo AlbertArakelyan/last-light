@@ -2,6 +2,33 @@
 
 use eframe::egui;
 
+use crate::theme;
+
+const ROW_HEIGHT: f32 = 28.0;
+
+/// A sidebar section heading (e.g. "FOLDERS") with a "+" button on the right.
+/// Returns true when "+" is clicked. Lays out right to left so a long heading
+/// is truncated instead of widening the panel.
+pub fn section_header(ui: &mut egui::Ui, title: &str, add_hint: &str, can_add: bool) -> bool {
+    ui.add_space(10.0);
+    let mut clicked = false;
+    ui.allocate_ui_with_layout(
+        egui::vec2(ui.available_width(), 22.0),
+        egui::Layout::right_to_left(egui::Align::Center),
+        |ui| {
+            clicked = ui
+                .add_enabled(can_add, theme::quiet_button("+"))
+                .on_hover_text(add_hint)
+                .clicked();
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                ui.add(egui::Label::new(theme::section_label(title)).truncate());
+            });
+        },
+    );
+    ui.add_space(4.0);
+    clicked
+}
+
 /// What the user did with a [`list_row`] this frame.
 pub enum RowAction {
     Open,
@@ -60,19 +87,25 @@ pub fn list_row(
     // of overflowing the row (which would make the panel grow).
     let mut action = None;
     let row = egui::Layout::right_to_left(egui::Align::Center);
-    ui.allocate_ui_with_layout(egui::vec2(ui.available_width(), 24.0), row, |ui| {
-        ui.menu_button("...", |ui| action = row_menu(ui).or(action.take()));
+    ui.allocate_ui_with_layout(egui::vec2(ui.available_width(), ROW_HEIGHT), row, |ui| {
+        ui.spacing_mut().item_spacing.x = 2.0;
+        egui::containers::menu::MenuButton::from_button(theme::quiet_button("..."))
+            .ui(ui, |ui| action = row_menu(ui).or(action.take()));
 
         let title_width = ui.available_width();
+        let color = if selected { theme::ACCENT } else { theme::TEXT };
         let title_button = ui
             .scope_builder(
                 egui::UiBuilder::new().layout(egui::Layout::left_to_right(egui::Align::Center)),
                 |ui| {
                     ui.set_max_width(title_width);
+                    // The grow atom takes the spare width, so the name sits on the left.
+                    let text = egui::RichText::new(title).color(color);
                     ui.add(
-                        egui::Button::selectable(selected, title)
+                        egui::Button::selectable(selected, (text, egui::Atom::grow()))
+                            .frame_when_inactive(selected)
                             .truncate()
-                            .min_size(egui::vec2(title_width, 24.0)),
+                            .min_size(egui::vec2(title_width, ROW_HEIGHT)),
                     )
                 },
             )
