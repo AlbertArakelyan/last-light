@@ -8,6 +8,9 @@ Built with Rust and [egui](https://github.com/emilk/egui). The AI runs on [llama
 
 <br clear="left">
 
+> [!NOTE]
+> Can be very useful and a must-have in a post-apocalyptic situation. Just in case 😄
+
 ![Last Light main screen with mini app cards](docs/screenshot.png)
 
 ## For users
