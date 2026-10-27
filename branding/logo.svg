@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512">
+<title>Last Light</title>
+  <circle cx="50" cy="50" r="50" fill="#f2a93b" fill-opacity="0.118"/>
+  <circle cx="50" cy="50" r="38" fill="#f2a93b" fill-opacity="0.235"/>
+  <circle cx="50" cy="50" r="28" fill="#f2a93b" fill-opacity="0.431"/>
+  <circle cx="50" cy="50" r="18" fill="#ffdc9a" fill-opacity="1.000"/>
+</svg>

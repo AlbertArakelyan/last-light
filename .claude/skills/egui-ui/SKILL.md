@@ -30,7 +30,7 @@ The app has one look, defined in `src/theme.rs`: warm charcoal surfaces lit by a
 - `theme::segmented(ui, enabled, current, &options)`: mutually exclusive modes (Split / Edit / View).
 - `theme::section_label(text)` / `widgets::section_header(ui, title, hint, can_add)`: small upper-case sidebar headings with a "+".
 - `widgets::list_row` / `widgets::inline_input`: sidebar rows (left-aligned, amber when selected, "..." menu, inline rename).
-- `theme::lamp(ui, size)`: the app's mark, for the header and empty states.
+- `theme::lamp(ui, size)`: the app's mark, for the header and empty states. Its circles live in `theme::LAMP_LAYERS`. The files in `branding/` are generated from that table: after changing it, run `cargo test render_logo -- --ignored`.
 
 **Screen layout conventions.**
 - **Panel frames:** every panel sets its own `Frame` with an explicit fill and margin instead of egui's default. Sidebars use `PANEL` with `Margin::symmetric(10, 4)`. A second sidebar column, like the Text Editor's folders, uses `BG` so the two read as levels. Toolbars and central areas use `BG` with 16–20 px side margins.

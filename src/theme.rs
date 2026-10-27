@@ -142,14 +142,25 @@ pub fn apply(ctx: &egui::Context) {
 /// A small amber light with a soft glow: the app's mark.
 pub fn lamp(ui: &mut egui::Ui, size: f32) {
     let (rect, _) = ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::hover());
-    let center = rect.center();
-    let painter = ui.painter();
-    for (radius, alpha) in [(0.5, 30), (0.38, 60), (0.28, 110)] {
-        let glow = Color32::from_rgba_unmultiplied(ACCENT.r(), ACCENT.g(), ACCENT.b(), alpha);
-        painter.circle_filled(center, size * radius, glow);
+    for (radius, color, alpha) in LAMP_LAYERS {
+        let [r, g, b, _] = color.to_array();
+        let fill = Color32::from_rgba_unmultiplied(r, g, b, alpha);
+        ui.painter()
+            .circle_filled(rect.center(), size * radius, fill);
     }
-    painter.circle_filled(center, size * 0.18, Color32::from_rgb(0xff, 0xdc, 0x9a));
 }
+
+/// The lamp's circles, painted in order from the outer glow to the core:
+/// radius as a fraction of the lamp's size, color, and opacity (0-255). The
+/// opacity is kept separate from the color so the logo files get the exact
+/// colors. The logo files in `branding/` are generated from this table (see
+/// `render_logo`), so change it here and regenerate them.
+pub const LAMP_LAYERS: [(f32, Color32, u8); 4] = [
+    (0.5, ACCENT, 30),
+    (0.38, ACCENT, 60),
+    (0.28, ACCENT, 110),
+    (0.18, Color32::from_rgb(0xff, 0xdc, 0x9a), 255),
+];
 
 /// A small, muted, upper-case heading for a sidebar section.
 pub fn section_label(text: &str) -> egui::RichText {
@@ -210,4 +221,88 @@ pub fn segmented<T: Copy + PartialEq>(
             }
         });
     picked
+}
+
+#[cfg(test)]
+mod logo_files {
+    use super::*;
+
+    const PNG_SIZES: [u32; 8] = [16, 32, 48, 64, 128, 256, 512, 1024];
+    /// Samples per pixel along each axis, for smooth circle edges.
+    const SUPERSAMPLING: u32 = 8;
+
+    /// Writes the lamp logo to `branding/` as an SVG and as PNGs at common
+    /// icon sizes, on a transparent background. Both are drawn from
+    /// `LAMP_LAYERS`, the same table the app paints with.
+    ///
+    /// `cargo test render_logo -- --ignored`
+    #[test]
+    #[ignore = "writes files into branding/; run by hand after changing the lamp"]
+    fn render_logo() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("branding");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("logo.svg"), svg()).unwrap();
+        for size in PNG_SIZES {
+            png(size)
+                .save(dir.join(format!("logo-{size}.png")))
+                .unwrap();
+        }
+    }
+
+    fn svg() -> String {
+        let circles: String = LAMP_LAYERS
+            .iter()
+            .map(|&(radius, color, alpha)| {
+                let [r, g, b, _] = color.to_array();
+                format!(
+                    "  <circle cx=\"50\" cy=\"50\" r=\"{}\" fill=\"#{r:02x}{g:02x}{b:02x}\" fill-opacity=\"{:.3}\"/>\n",
+                    radius * 100.0,
+                    f32::from(alpha) / 255.0
+                )
+            })
+            .collect();
+        format!(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\" width=\"512\" height=\"512\">\n\
+             <title>Last Light</title>\n{circles}</svg>\n"
+        )
+    }
+
+    /// Composites the circles over a transparent background with "over"
+    /// blending in premultiplied sRGB, as egui and SVG renderers do.
+    fn png(size: u32) -> image::RgbaImage {
+        let center = size as f32 / 2.0;
+        let samples = (SUPERSAMPLING * SUPERSAMPLING) as f32;
+        image::RgbaImage::from_fn(size, size, |x, y| {
+            let mut out = [0.0f32; 4]; // premultiplied, 0..=1
+            for (radius, color, alpha) in LAMP_LAYERS {
+                let radius = radius * size as f32;
+                let mut inside = 0;
+                for sy in 0..SUPERSAMPLING {
+                    for sx in 0..SUPERSAMPLING {
+                        let px = x as f32 + (sx as f32 + 0.5) / SUPERSAMPLING as f32 - center;
+                        let py = y as f32 + (sy as f32 + 0.5) / SUPERSAMPLING as f32 - center;
+                        inside += u32::from(px * px + py * py <= radius * radius);
+                    }
+                }
+                let coverage = inside as f32 / samples;
+                let alpha = f32::from(alpha) / 255.0 * coverage;
+                let [r, g, b, _] = color.to_array().map(|c| f32::from(c) / 255.0);
+                let src = [r * alpha, g * alpha, b * alpha, alpha];
+                for i in 0..4 {
+                    out[i] = src[i] + out[i] * (1.0 - src[3]);
+                }
+            }
+            let alpha = out[3];
+            let channel = |c: f32| {
+                let straight = if alpha > 0.0 { c / alpha } else { 0.0 };
+                (straight * 255.0).round().clamp(0.0, 255.0) as u8
+            };
+            image::Rgba([
+                channel(out[0]),
+                channel(out[1]),
+                channel(out[2]),
+                (alpha * 255.0).round() as u8,
+            ])
+        })
+    }
 }
