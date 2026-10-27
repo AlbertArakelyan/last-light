@@ -8,13 +8,20 @@ use eframe::egui;
 const CARD_MIN_WIDTH: f32 = 220.0;
 const CARD_HEIGHT: f32 = 136.0;
 const CARD_GAP: f32 = 16.0;
+/// The window and taskbar icon is drawn at this size; the OS scales it down.
+const ICON_SIZE: u32 = 64;
 
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("Last Light")
             .with_inner_size([1024.0, 720.0])
-            .with_min_inner_size([640.0, 420.0]),
+            .with_min_inner_size([640.0, 420.0])
+            .with_icon(egui::IconData {
+                rgba: theme::lamp_rgba(ICON_SIZE),
+                width: ICON_SIZE,
+                height: ICON_SIZE,
+            }),
         ..Default::default()
     };
 
