@@ -5,6 +5,7 @@ mod store;
 mod worker;
 
 use eframe::egui;
+use egui_commonmark::{CommonMarkCache, CommonMarkViewer};
 
 use super::MiniApp;
 use super::widgets::{RowAction, list_row, section_header};
@@ -79,6 +80,8 @@ pub struct AiChat {
     renaming: Option<(i64, String)>,
     notice: Option<String>,
     input: String,
+    /// Rendering cache for the Markdown in the AI's replies.
+    markdown: CommonMarkCache,
 }
 
 impl AiChat {
@@ -95,6 +98,7 @@ impl AiChat {
             renaming: None,
             notice: warning,
             input: String::new(),
+            markdown: CommonMarkCache::default(),
         };
         app.refresh_chats();
         app
@@ -340,7 +344,7 @@ impl AiChat {
             });
     }
 
-    fn message_list(&self, ui: &mut egui::Ui) {
+    fn message_list(&mut self, ui: &mut egui::Ui) {
         let streaming = self
             .streaming
             .as_ref()
@@ -369,11 +373,12 @@ impl AiChat {
             .show(ui, |ui| {
                 reading_column(ui, |ui| {
                     ui.add_space(8.0);
-                    for message in &self.messages {
-                        message_ui(ui, message.role, &message.content);
+                    for (i, message) in self.messages.iter().enumerate() {
+                        message_ui(ui, &mut self.markdown, i, message.role, &message.content);
                     }
                     if let Some(streaming) = streaming {
-                        message_ui(ui, Role::Assistant, &streaming.text);
+                        let i = self.messages.len();
+                        message_ui(ui, &mut self.markdown, i, Role::Assistant, &streaming.text);
                     }
                     ui.add_space(8.0);
                 });
@@ -463,44 +468,59 @@ fn reading_column(ui: &mut egui::Ui, add_contents: impl FnOnce(&mut egui::Ui)) {
     });
 }
 
-/// One message as a bubble: the user's on the right in amber, the AI's on the
-/// left next to the lamp.
-fn message_ui(ui: &mut egui::Ui, role: Role, text: &str) {
+/// One message as a bubble: the user's on the right in amber as plain text,
+/// the AI's on the left next to the lamp, rendered as Markdown. `index` keeps
+/// each reply's widget ids apart, since several replies share one `markdown`
+/// cache.
+fn message_ui(
+    ui: &mut egui::Ui,
+    markdown: &mut CommonMarkCache,
+    index: usize,
+    role: Role,
+    text: &str,
+) {
     const PADDING: egui::Vec2 = egui::vec2(14.0, 10.0);
     const LAMP: f32 = 22.0;
-    let is_user = role == Role::User;
-
-    // Lay the text out first so the bubble can hug it, then push the user's
-    // bubble to the right by the space left over.
-    let (text, color) = match text {
-        "" => ("Thinking...", theme::TEXT_FAINT),
-        text => (text, theme::TEXT),
-    };
     let max_text_width = ui.available_width() * 0.78 - 2.0 * PADDING.x;
-    let galley = ui.painter().layout(
-        text.to_owned(),
-        egui::TextStyle::Body.resolve(ui.style()),
-        color,
-        max_text_width,
-    );
-    let bubble_width = galley.size().x + 2.0 * PADDING.x;
-
-    ui.horizontal_top(|ui| {
-        if is_user {
-            ui.add_space(ui.available_width() - bubble_width);
-        } else {
-            theme::lamp(ui, LAMP);
-        }
+    let bubble = |fill| {
         egui::Frame::new()
-            .fill(if is_user {
-                theme::ACCENT_SOFT
-            } else {
-                theme::RAISED
-            })
+            .fill(fill)
             .corner_radius(12)
             .inner_margin(egui::Margin::symmetric(PADDING.x as i8, PADDING.y as i8))
-            .show(ui, |ui| ui.add(egui::Label::new(galley)));
-    });
+    };
+
+    if role == Role::User {
+        // Lay the text out first so the bubble can hug it, then push it to
+        // the right by the space left over.
+        let galley = ui.painter().layout(
+            text.to_owned(),
+            egui::TextStyle::Body.resolve(ui.style()),
+            theme::TEXT,
+            max_text_width,
+        );
+        let bubble_width = galley.size().x + 2.0 * PADDING.x;
+        ui.horizontal_top(|ui| {
+            ui.add_space(ui.available_width() - bubble_width);
+            bubble(theme::ACCENT_SOFT).show(ui, |ui| ui.add(egui::Label::new(galley)));
+        });
+    } else {
+        ui.horizontal_top(|ui| {
+            theme::lamp(ui, LAMP);
+            bubble(theme::RAISED).show(ui, |ui| {
+                ui.set_max_width(max_text_width);
+                ui.vertical(|ui| {
+                    if text.is_empty() {
+                        let thinking = egui::RichText::new("Thinking...").color(theme::TEXT_FAINT);
+                        ui.label(thinking);
+                    } else {
+                        ui.push_id(index, |ui| {
+                            CommonMarkViewer::new().show(ui, markdown, text);
+                        });
+                    }
+                });
+            });
+        });
+    }
     ui.add_space(10.0);
 }
 
@@ -545,9 +565,13 @@ impl AiChat {
                     (Role::User, "And if I have no fuel?"),
                     (
                         Role::Assistant,
-                        "Use sunlight: fill clear plastic bottles, lay them on a reflective \
-                         surface in full sun for at least six hours, or two days if it's cloudy. \
-                         It works best on water that's already clear.",
+                        "Use **sunlight** (the SODIS method):\n\n\
+                         1. Fill clear plastic bottles, up to 2 litres each.\n\
+                         2. Lay them on a reflective surface in full sun.\n\
+                         3. Wait at least **6 hours**, or two days if it's cloudy.\n\n\
+                         | Weather | Time |\n|---|---|\n| Sunny | 6 h |\n| Cloudy | 2 days |\n\n\
+                         It works best on water that's already clear, so filter it through \
+                         `cloth` first.",
                     ),
                 ],
             ),
@@ -574,6 +598,7 @@ impl AiChat {
             renaming: None,
             notice: None,
             input: String::new(),
+            markdown: CommonMarkCache::default(),
         };
         app.refresh_chats();
         let first = app.chats.first().map(|c| c.id);

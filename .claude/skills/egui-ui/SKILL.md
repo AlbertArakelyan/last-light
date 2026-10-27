@@ -20,6 +20,7 @@ The app has one look, defined in `src/theme.rs`: warm charcoal surfaces lit by a
 | `RAISED` / `HOVER` | Cards, buttons and AI chat bubbles, at rest and hovered |
 | `BORDER` / `BORDER_STRONG` | 1 px outlines and separators; the strong one on hover |
 | `TEXT_STRONG` / `TEXT` / `TEXT_MUTED` / `TEXT_FAINT` | Titles / body / secondary info / hints and disabled |
+| `TEXT_BOLD` | Markdown bold, headings and list markers. egui has no bold font weight, so bold is shown by this soft amber. It is egui's "strong" color (`widgets.active` text), so any `RichText::strong()` without an explicit color turns amber; set a color if you want plain emphasis. |
 | `ACCENT` | The one highlight: selection, focus, the primary action, the lamp. Use it sparingly. |
 | `ACCENT_SOFT` | Tinted backgrounds: selected rows, badges, the user's chat bubbles |
 | `WARN` / `ERROR` / `DANGER` | Warning text / error text / fill of destructive buttons such as Delete |

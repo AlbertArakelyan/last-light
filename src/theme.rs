@@ -20,6 +20,10 @@ pub const TEXT: Color32 = Color32::from_rgb(0xec, 0xe4, 0xd8);
 pub const TEXT_STRONG: Color32 = Color32::from_rgb(0xfb, 0xf6, 0xee);
 pub const TEXT_MUTED: Color32 = Color32::from_rgb(0xa8, 0x9d, 0x8e);
 pub const TEXT_FAINT: Color32 = Color32::from_rgb(0x72, 0x69, 0x5d);
+/// Bold text and headings in Markdown. egui's default font has no bold
+/// weight, so "strong" text is shown by color: a soft lamp amber, clearly
+/// apart from body text but quieter than `ACCENT`.
+pub const TEXT_BOLD: Color32 = Color32::from_rgb(0xf6, 0xcf, 0x8c);
 
 pub const ACCENT: Color32 = Color32::from_rgb(0xf2, 0xa9, 0x3b);
 /// The accent at low strength, pre-blended over `PANEL`: selected rows, badges,
@@ -108,11 +112,13 @@ pub fn apply(ctx: &egui::Context) {
                 Stroke::new(1.0, BORDER_STRONG),
                 TEXT_STRONG,
             ),
+            // The active text color doubles as egui's "strong" text color,
+            // which is how Markdown bold and headings are drawn.
             (
                 &mut w.active,
                 BORDER_STRONG,
                 Stroke::new(1.0, ACCENT),
-                TEXT_STRONG,
+                TEXT_BOLD,
             ),
             (
                 &mut w.open,
